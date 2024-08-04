@@ -195,3 +195,12 @@ layer = custom_layer(symmetry, dim=[2,3],
 output = layer(torch.randn([1,1,8,8]))
 
 layer.new_weights # symmetry along main diagonal
+
+
+
+###### training profiling ######
+from torch.profiler import profile, record_function, ProfilerActivity
+with torch.profiler.profile(
+        activities=[torch.profiler.ProfilerActivity.CPU,torch.profiler.ProfilerActivity.CUDA], profile_memory=True, record_shapes=True) as p:
+    trainer.fit()
+print(p.key_averages().table(sort_by="cpu_memory_usage", row_limit=50))

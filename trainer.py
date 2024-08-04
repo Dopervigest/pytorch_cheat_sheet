@@ -96,6 +96,126 @@ class Trainer:
         torch.save(self.model, f'{self.out_dir}/last.pt') 
                 
 
+
+####### RoBERTa Trainer #########
+class Trainer:
+    def __init__(self, model, opt, criterion, train_dataloader,
+                 test_dataloader, out_dir, epochs, scheduler,
+                 device, tokenizer, pretrain=False):
+        self.pretrain = pretrain
+        self.model = model
+        self.opt = opt
+        self.criterion = criterion
+        self.train_dataloader = train_dataloader
+        self.test_dataloader = test_dataloader
+        self.out_dir = out_dir
+        self.epochs = epochs
+        self.device = device
+        self.scheduler = scheduler
+        self.tokenizer = tokenizer
+        
+        if not os.path.exists(self.out_dir):
+            os.makedirs(self.out_dir)
+
+    def fit(self):
+        if self.pretrain:
+            for param in model.roberta.parameters():
+               param.requires_grad = False
+        else:
+            for param in model.roberta.parameters():
+               param.requires_grad = True
+            
+        
+        with open(f'{self.out_dir}/logs.csv', 'w') as file:
+            file.write('epoch,loss,accuracy,best_accuracy,val_loss,val_accuracy,best_val_accuracy\n')
+            
+        self.tokenizer.save_pretrained('./best_trained_model/')
+        
+        best_accuracy = 0.0 
+        best_eval_accuracy = 0.0
+        
+        
+        for epoch in tqdm(range(self.epochs)): 
+            self.model.train() 
+            
+            running_loss = 0.0  
+            running_acc = 0.0
+            
+            running_eval_loss = 0.0 
+            running_eval_acc = 0.0
+        
+            for batch in self.train_dataloader:
+                
+                input_ids = batch['input_ids'].to(self.device)
+                attention_mask = batch['attention_mask'].to(self.device)
+                labels = batch['labels'].to(self.device)
+
+                self.opt.zero_grad()
+                outputs = self.model(input_ids, attention_mask=attention_mask)
+                loss = criterion(outputs, labels)
+                
+                loss.backward()
+                self.opt.step()
+                
+                running_loss += loss.detach() 
+                
+                accuracy = torch.div(torch.sum(torch.argmax(outputs, dim=-1) == torch.argmax(labels, dim=-1)),
+                                     labels.size(dim=0))             
+                running_acc += accuracy 
+                    
+            running_loss = running_loss/len(self.train_dataloader) 
+            running_acc = running_acc/len(self.train_dataloader)
+        
+            if running_acc > best_accuracy: 
+                    best_accuracy = running_acc
+            
+            self.model.eval()
+            for batch in self.test_dataloader: 
+                input_ids = batch['input_ids'].to(self.device)
+                attention_mask = batch['attention_mask'].to(self.device)
+                labels = batch['labels'].to(self.device)
+                
+                with torch.no_grad():
+                    outputs = self.model(input_ids, attention_mask=attention_mask)
+                    loss = self.criterion(outputs, labels)
+
+                    running_eval_loss += loss.detach()
+                    accuracy = torch.div(torch.sum(torch.argmax(outputs, dim=-1) == torch.argmax(labels, dim=-1)),
+                                     labels.size(dim=0)) 
+                    running_eval_acc += accuracy
+            
+            running_eval_loss = running_eval_loss/len(self.test_dataloader)
+            running_eval_acc = running_eval_acc/len(self.test_dataloader)
+        
+            if running_eval_acc>= best_eval_accuracy:
+                best_eval_accuracy = running_eval_acc
+                torch.save(self.model, f'{self.out_dir}/best.pt')
+
+            
+            print(f'EPOCH {epoch+1}: Loss: {running_loss}, Accuracy: {running_acc}, Best_accuracy: {best_accuracy}')
+            print(f'Val_loss: {running_eval_loss}, Val_accuracy: {running_eval_acc}, Best_val_accuracy: {best_eval_accuracy}')
+            print()
+                
+            with open(f'{self.out_dir}/logs.csv', 'a') as file:
+                file.write(f'{epoch+1},{running_loss},{running_acc},{best_accuracy},{running_eval_loss},{running_eval_acc},{best_eval_accuracy}\n')
+                  
+            if self.scheduler:
+                if type(self.scheduler) == torch.optim.lr_scheduler.ReduceLROnPlateau:
+                    self.scheduler.step(running_eval_loss)
+                else:
+                    self.scheduler.step()
+                
+        torch.save(self.model, f'{self.out_dir}/last.pt') 
+
+
+
+
+
+
+
+
+
+
 ###### Trainer with Tensorboard ######
 # start Tensorboard session with:
 # tensorboard --logdir runs 

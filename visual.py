@@ -26,6 +26,7 @@ plt.legend()
 
 
 ###### sklearn classification report ######
+
 out_dir = './models/clinical'
 
 preds = []
@@ -47,7 +48,7 @@ labels = np.argmax(labels, axis=1)
 
 
 from sklearn.metrics import classification_report
-report = classification_report(y_true=labels, y_pred=preds)
+report = classification_report(y_true=labels, y_pred=preds, output_dict=True)
 
 df = pd.DataFrame(report).transpose()
 df.to_csv('file_name.csv')
@@ -55,6 +56,7 @@ print(report)
 
 
 ###### sklearn confusion matrix ######
+import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
 cm = confusion_matrix(y_true=labels,
@@ -63,5 +65,5 @@ cm = confusion_matrix(y_true=labels,
 plt.Figure()
 disp = ConfusionMatrixDisplay(cm,)
 
-disp.plot(values_format='')
+disp.plot(cmap=plt.cm.Blues, values_format='')
 plt.savefig('confusion_matrix.jpg')
